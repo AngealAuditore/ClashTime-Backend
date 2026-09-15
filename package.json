@@ -1,0 +1,13 @@
+{
+  "name": "clashtime-apns-engine",
+  "version": "1.0.0",
+  "description": "ClashTime APNs Live Engine para Live Activities y Lock Screen",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["clashtime", "apns", "sports", "live-activities"]
+}
