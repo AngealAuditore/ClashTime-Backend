@@ -8,7 +8,7 @@ const http2 = require("http2");
 const fs = require("fs");
 const crypto = require("crypto");
 
-// 1. Configuración de Credenciales de Apple
+// 1. Configuraci√≥n de Credenciales de Apple
 const KEY_ID = process.env.KEY_ID || "5933264424";
 const TEAM_ID = process.env.TEAM_ID || "S28DC7S995";
 const BUNDLE_ID = process.env.BUNDLE_ID || "com.auditore.ClashTime";
@@ -26,10 +26,10 @@ if (!AUTH_KEY) {
 }
 
 if (!AUTH_KEY) {
-    console.error("⚠️ ADVERTENCIA: No se encontró la llave APNs en variable de entorno APNS_AUTH_KEY ni en disco local.");
+    console.error("‚ö†Ô∏è ADVERTENCIA: No se encontr√≥ la llave APNs en variable de entorno APNS_AUTH_KEY ni en disco local.");
 }
 
-// 2. Generador y Caché de Tokens JWT para APNs
+// 2. Generador y Cach√© de Tokens JWT para APNs
 let cachedJWT = null;
 let jwtGeneratedAt = 0;
 
@@ -52,22 +52,22 @@ function getAPNsJWT() {
     return cachedJWT;
 }
 
-// 3. Almacén de Dispositivos Registrados
+// 3. Almac√©n de Dispositivos Registrados
 const registeredDevices = new Map();
 
-// 4. Función de Envío APNs HTTP/2
+// 4. Funci√≥n de Env√≠o APNs HTTP/2
 function sendLiveActivityPush(deviceToken, contentState, alertMessage = null, isFinal = false) {
     return new Promise((resolve, reject) => {
         const jwt = getAPNsJWT();
         if (!jwt) {
-            console.error("❌ No se puede enviar push: Falta JWT");
+            console.error("‚ùå No se puede enviar push: Falta JWT");
             return resolve({ success: false, error: "Missing JWT" });
         }
 
         const client = http2.connect(APNS_HOST);
 
         client.on("error", (err) => {
-            console.error("⚠️ [APNs HTTP2] Error de conexión:", err.message);
+            console.error("‚ö†Ô∏è [APNs HTTP2] Error de conexi√≥n:", err.message);
             reject(err);
         });
 
@@ -79,8 +79,8 @@ function sendLiveActivityPush(deviceToken, contentState, alertMessage = null, is
 
         if (alertMessage) {
             apsPayload.alert = {
-                title: alertMessage.title || "🏈 ClashTime NFL",
-                body: alertMessage.body || "Actualización del partido",
+                title: alertMessage.title || "üèà ClashTime NFL",
+                body: alertMessage.body || "Actualizaci√≥n del partido",
                 sound: "default"
             };
         }
@@ -114,17 +114,17 @@ function sendLiveActivityPush(deviceToken, contentState, alertMessage = null, is
         req.on("end", () => {
             client.close();
             if (statusCode === 200) {
-                console.log(`🚀 [APNs 200 OK] ¡Push entregado con éxito a Apple! (${contentState.statusBadgeText})`);
+                console.log(`üöÄ [APNs 200 OK] ¬°Push entregado con √©xito a Apple! (${contentState.statusBadgeText})`);
                 resolve({ success: true, statusCode });
             } else {
-                console.error(`⚠️ [APNs ${statusCode}] Error de Apple:`, responseBody);
+                console.error(`‚ö†Ô∏è [APNs ${statusCode}] Error de Apple:`, responseBody);
                 resolve({ success: false, statusCode, responseBody });
             }
         });
 
         req.on("error", (err) => {
             client.close();
-            console.error("❌ [APNs Req Error]:", err.message);
+            console.error("‚ùå [APNs Req Error]:", err.message);
             reject(err);
         });
 
@@ -133,123 +133,288 @@ function sendLiveActivityPush(deviceToken, contentState, alertMessage = null, is
     });
 }
 
-// 5. Poller Continuo de ESPN NFL
+function abbreviatePlayerName(name) {
+    if (!name) return "";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length <= 1) return name;
+    return `${parts[0].charAt(0)}. ${parts.slice(1).join(" ")}`;
+}
+
+// 5. Poller Continuo de ESPN (NFL & Soccer)
+const SOCCER_LEAGUES = [
+    "mex.1", "esp.1", "eng.1", "uefa.champions", "usa.1", 
+    "fifa.friendly", "ita.1", "ger.1", "fra.1", "concacaf.champions", "conmebol.libertadores"
+];
+
 async function pollESPNAndNotify() {
     if (registeredDevices.size === 0) return;
 
+    // A. Sondeo NFL
     try {
         const response = await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard", {
             headers: { "User-Agent": "Mozilla/5.0 ClashTimeServer/1.0" }
         });
-        if (!response.ok) return;
-        const data = await response.json();
-        const events = data.events || [];
+        if (response.ok) {
+            const data = await response.json();
+            const events = data.events || [];
 
-        for (const [deviceToken, info] of registeredDevices.entries()) {
-            const event = events.find(e => e.id === info.eventId);
-            if (!event) continue;
+            for (const [deviceToken, info] of registeredDevices.entries()) {
+                const event = events.find(e => e.id === info.eventId);
+                if (!event) continue;
 
-            const comp = event.competitions?.[0];
-            const competitors = comp?.competitors || [];
-            if (competitors.length < 2) continue;
+                    const comp = event.competitions?.[0];
+                    const competitors = comp?.competitors || [];
+                    if (competitors.length < 2) continue;
 
-            const home = competitors.find(c => c.homeAway === "home") || competitors[0];
-            const away = competitors.find(c => c.homeAway === "away") || competitors[1];
+                    const home = competitors.find(c => c.homeAway === "home") || competitors[0];
+                    const away = competitors.find(c => c.homeAway === "away") || competitors[1];
 
-            const homeTeam = home.team?.displayName || "Home";
-            const awayTeam = away.team?.displayName || "Away";
-            const homeScore = home.score || "0";
-            const awayScore = away.score || "0";
-            const currentScore = `${awayScore} - ${homeScore}`;
+                    const homeTeam = home.team?.displayName || "Home";
+                    const awayTeam = away.team?.displayName || "Away";
+                    const homeScore = home.score || "0";
+                    const awayScore = away.score || "0";
+                    const currentScore = `${awayScore} - ${homeScore}`;
 
-            const status = event.status || {};
-            const statusType = status.type || {};
-            const state = statusType.state || "pre";
-            const detail = statusType.detail || statusType.shortDetail || "";
-            const isCompleted = statusType.completed || false;
-            const displayClock = status.displayClock || "0:00";
-            const period = status.period || 0;
+                    const status = event.status || {};
+                    const statusType = status.type || {};
+                    const state = statusType.state || "pre";
+                    const detail = statusType.detail || statusType.shortDetail || "";
+                    const isCompleted = statusType.completed || false;
+                    const displayClock = status.displayClock || "0:00";
+                    const period = status.period || 0;
 
-            const situation = comp.situation || {};
-            const downDistance = situation.downDistanceText;
+                    const situation = comp.situation || {};
+                    const downDistance = situation.downDistanceText;
 
-            const isHalftime = detail.toLowerCase().includes("half") || detail === "HT";
-            const isLive = (state === "in" || isHalftime);
-            const isFinal = (state === "post" || isCompleted || detail.toLowerCase().includes("final"));
+                    const isHalftime = detail.toLowerCase().includes("half") || detail === "HT";
+                    const isLive = (state === "in" || isHalftime);
+                    const isFinal = (state === "post" || isCompleted || detail.toLowerCase().includes("final"));
 
-            let statusDisplay = "";
-            let secondaryText = "";
+                    let statusDisplay = "";
+                    let secondaryText = "";
 
-            if (isHalftime) {
-                statusDisplay = "MEDIO TIEMPO";
-                secondaryText = "Medio Tiempo";
-            } else if (isLive) {
-                const qStr = period <= 4 ? `Q${period}` : "OT";
-                if (downDistance) {
-                    statusDisplay = `${qStr} ${displayClock} • ${downDistance}`;
-                    secondaryText = downDistance;
-                } else {
-                    statusDisplay = `${qStr} ${displayClock}`;
-                    secondaryText = `${qStr} ${displayClock}`;
+                    if (isHalftime) {
+                        statusDisplay = "MEDIO TIEMPO";
+                        secondaryText = "Medio Tiempo";
+                    } else if (isLive) {
+                        const qStr = period <= 4 ? `Q${period}` : "OT";
+                        if (downDistance) {
+                            statusDisplay = `${qStr} ${displayClock} ‚Ä¢ ${downDistance}`;
+                            secondaryText = downDistance;
+                        } else {
+                            statusDisplay = `${qStr} ${displayClock}`;
+                            secondaryText = `${qStr} ${displayClock}`;
+                        }
+                    } else if (isFinal) {
+                        statusDisplay = "FINAL";
+                        secondaryText = "Final NFL";
+                    } else {
+                        statusDisplay = detail;
+                        secondaryText = "NFL ‚Ä¢ F√∫tbol Americano";
+                    }
+
+                    let progress = 0.5;
+                    if (statusDisplay.includes("Q1")) progress = 0.25;
+                    else if (statusDisplay.includes("Q2")) progress = 0.50;
+                    else if (statusDisplay.includes("Q3")) progress = 0.75;
+                    else if (statusDisplay.includes("Q4")) progress = 0.95;
+                    else if (isFinal) progress = 1.0;
+
+                    const scoreChanged = (info.lastScore !== currentScore);
+                    const statusChanged = (info.lastStatus !== statusDisplay);
+
+                    if (scoreChanged || statusChanged || !info.hasPushedInitial) {
+                        info.lastScore = currentScore;
+                        info.lastStatus = statusDisplay;
+                        info.hasPushedInitial = true;
+
+                        const contentState = {
+                            isLive: isLive,
+                            statusBadgeText: statusDisplay,
+                            mainHeadline: `${awayTeam} vs. ${homeTeam}`,
+                            secondaryDetail: secondaryText,
+                            timeOrCountdown: statusDisplay,
+                            scoreOrRound: currentScore,
+                            alertText: null,
+                            progressFraction: progress,
+                            liveClockStartDate: null,
+                            liveClockEndDate: null,
+                            scheduledKickoffDate: null,
+                            goalScorersText: null,
+                            cardsText: null
+                        };
+
+                        let alertMessage = null;
+                        if (scoreChanged && isLive) {
+                            alertMessage = {
+                                title: "üèà ¬°TOUCHDOWN / PUNTOS NFL!",
+                                body: `${awayTeam} ${awayScore} - ${homeScore} ${homeTeam} (${statusDisplay})`
+                            };
+                        }
+
+                        console.log(`üì° [Cambio Detectado NFL] ${awayTeam} ${currentScore} ${homeTeam} | ${statusDisplay}`);
+                        await sendLiveActivityPush(deviceToken, contentState, alertMessage, isFinal);
+                    }
                 }
-            } else if (isFinal) {
-                statusDisplay = "FINAL";
-                secondaryText = "Final NFL";
-            } else {
-                statusDisplay = detail;
-                secondaryText = "NFL • Fútbol Americano";
             }
+        } catch (err) {
+            console.error("‚ö†Ô∏è Error consultando ESPN NFL:", err.message);
+        }
 
-            let progress = 0.5;
-            if (statusDisplay.includes("Q1")) progress = 0.25;
-            else if (statusDisplay.includes("Q2")) progress = 0.50;
-            else if (statusDisplay.includes("Q3")) progress = 0.75;
-            else if (statusDisplay.includes("Q4")) progress = 0.95;
-            else if (isFinal) progress = 1.0;
+    // B. Sondeo F√∫tbol (Soccer)
+    for (const league of SOCCER_LEAGUES) {
+        try {
+            const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard`, {
+                headers: { "User-Agent": "Mozilla/5.0 ClashTimeServer/1.0" }
+            });
+            if (!response.ok) continue;
+            const data = await response.json();
+            const events = data.events || [];
 
-            const scoreChanged = (info.lastScore !== currentScore);
-            const statusChanged = (info.lastStatus !== statusDisplay);
+            for (const [deviceToken, info] of registeredDevices.entries()) {
+                const event = events.find(e => e.id === info.eventId);
+                if (!event) continue;
 
-            if (scoreChanged || statusChanged || !info.hasPushedInitial) {
-                info.lastScore = currentScore;
-                info.lastStatus = statusDisplay;
-                info.hasPushedInitial = true;
+                    const comp = event.competitions?.[0];
+                    const competitors = comp?.competitors || [];
+                    if (competitors.length < 2) continue;
 
-                const contentState = {
-                    isLive: isLive,
-                    statusBadgeText: statusDisplay,
-                    mainHeadline: `${awayTeam} vs. ${homeTeam}`,
-                    secondaryDetail: secondaryText,
-                    timeOrCountdown: statusDisplay,
-                    scoreOrRound: currentScore,
-                    alertText: null,
-                    progressFraction: progress,
-                    liveClockStartDate: null,
-                    liveClockEndDate: null,
-                    scheduledKickoffDate: null,
-                    goalScorersText: null,
-                    cardsText: null
-                };
+                    const home = competitors.find(c => c.homeAway === "home") || competitors[0];
+                    const away = competitors.find(c => c.homeAway === "away") || competitors[1];
 
-                let alertMessage = null;
-                if (scoreChanged && isLive) {
-                    alertMessage = {
-                        title: "🏈 ¡TOUCHDOWN / PUNTOS NFL!",
-                        body: `${awayTeam} ${awayScore} - ${homeScore} ${homeTeam} (${statusDisplay})`
-                    };
+                    const homeTeam = home.team?.displayName || "Local";
+                    const awayTeam = away.team?.displayName || "Visitante";
+                    const homeScore = home.score || "0";
+                    const awayScore = away.score || "0";
+                    const currentScore = `${awayScore} - ${homeScore}`;
+
+                    const status = event.status || {};
+                    const statusType = status.type || {};
+                    const state = statusType.state || "pre";
+                    const detail = statusType.detail || statusType.shortDetail || "";
+                    const detailLower = detail.toLowerCase();
+                    const isCompleted = statusType.completed || false;
+                    const displayClock = status.displayClock || "";
+
+                    const isHalftime = detailLower.includes("half") || detailLower.includes("medio") || detail === "HT";
+                    const isLive = (state === "in" || isHalftime);
+                    const isFinal = (state === "post" || isCompleted || detailLower.includes("final") || detail === "FT");
+
+                    // Parsear Goles y Tarjetas desde comp.details
+                    const details = comp.details || [];
+                    let scorersList = [];
+                    let cardsList = [];
+
+                    for (const item of details) {
+                        const typeObj = item.type || {};
+                        const typeText = (typeObj.text || "").toLowerCase();
+                        const isScoringPlay = item.scoringPlay || false;
+                        const isYellow = item.yellowCard || typeText.includes("yellow");
+                        const isRed = item.redCard || typeText.includes("red");
+
+                        const clockObj = item.clock || {};
+                        const minuteStr = clockObj.displayValue || "";
+                        const cleanMinute = minuteStr ? (minuteStr.includes("'") ? minuteStr : `${minuteStr}'`) : "";
+
+                        const athletes = item.athletesInvolved || [];
+                        const first = athletes[0];
+                        if (!first) continue;
+                        const athleteName = first.shortName || first.displayName || "";
+                        if (!athleteName) continue;
+                        const abbrev = abbreviatePlayerName(athleteName);
+
+                        if (isScoringPlay || typeText.includes("goal")) {
+                            scorersList.push(`${abbrev} ${cleanMinute}`);
+                        } else if (isRed) {
+                            cardsList.push(`üü• ${abbrev} ${cleanMinute}`);
+                        } else if (isYellow) {
+                            cardsList.push(`üü® ${abbrev} ${cleanMinute}`);
+                        }
+                    }
+
+                    const goalScorersText = scorersList.length > 0 ? scorersList.join(" ‚Ä¢ ") : null;
+                    const cardsText = cardsList.length > 0 ? cardsList.join(" ‚Ä¢ ") : null;
+
+                    let statusDisplay = "";
+                    let secondaryText = "";
+
+                    if (isHalftime) {
+                        statusDisplay = "MEDIO TIEMPO";
+                        secondaryText = "Medio Tiempo";
+                    } else if (isLive) {
+                        const halfName = status.period === 2 ? "2do Tiempo" : "1er Tiempo";
+                        const clockClean = (displayClock || "").replace(/'/g, "").trim();
+                        const clockStr = clockClean ? `${clockClean}'` : "";
+                        statusDisplay = "EN VIVO";
+                        secondaryText = clockStr ? `${clockStr} ‚Ä¢ ${halfName}` : halfName;
+                    } else if (isFinal) {
+                        statusDisplay = "FINAL";
+                        secondaryText = "Partido Finalizado";
+                    } else {
+                        statusDisplay = detail;
+                        secondaryText = "F√∫tbol";
+                    }
+
+                    const scoreChanged = (info.lastScore !== currentScore);
+                    const statusChanged = (info.lastStatus !== secondaryText);
+                    const cardsChanged = (info.lastCards !== cardsText);
+
+                    if (scoreChanged || statusChanged || cardsChanged || !info.hasPushedInitial) {
+                        info.lastScore = currentScore;
+                        info.lastStatus = secondaryText;
+                        info.lastCards = cardsText;
+                        info.hasPushedInitial = true;
+
+                        const contentState = {
+                            isLive: isLive,
+                            statusBadgeText: isHalftime ? "MEDIO TIEMPO" : (isFinal ? "FINAL" : "EN VIVO"),
+                            mainHeadline: `${awayTeam} vs. ${homeTeam}`,
+                            secondaryDetail: secondaryText,
+                            timeOrCountdown: secondaryText,
+                            scoreOrRound: currentScore,
+                            alertText: null,
+                            progressFraction: isFinal ? 1.0 : (isHalftime ? 0.5 : 0.7),
+                            liveClockStartDate: null,
+                            liveClockEndDate: null,
+                            scheduledKickoffDate: null,
+                            goalScorersText: goalScorersText,
+                            cardsText: cardsText
+                        };
+
+                        let alertMessage = null;
+                        if (scoreChanged && isLive) {
+                            alertMessage = {
+                                title: "‚öΩ ¬°GOOOL!",
+                                body: `${awayTeam} ${awayScore} - ${homeScore} ${homeTeam} (${secondaryText})`
+                            };
+                        } else if (cardsChanged && isLive && cardsText) {
+                            const isRed = cardsText.includes("üü•");
+                            alertMessage = {
+                                title: isRed ? "üü• ¬°TARJETA ROJA!" : "üü® ¬°TARJETA AMARILLA!",
+                                body: `${awayTeam} vs. ${homeTeam} ‚Ä¢ ${cardsText}`
+                            };
+                        }
+
+                        console.log(`üì° [Cambio Detectado Soccer] ${awayTeam} ${currentScore} ${homeTeam} | ${secondaryText} | Tarjetas: ${cardsText || "Ninguna"}`);
+                        await sendLiveActivityPush(deviceToken, contentState, alertMessage, isFinal);
+                    }
                 }
-
-                console.log(`📡 [Cambio Detectado] ${awayTeam} ${currentScore} ${homeTeam} | ${statusDisplay}`);
-                await sendLiveActivityPush(deviceToken, contentState, alertMessage, isFinal);
+            } catch (err) {
+                // Silencioso por liga
             }
         }
-    } catch (err) {
-        console.error("⚠️ Error consultando ESPN:", err.message);
-    }
 }
 
 // Ejecutar sondeo cada 10 segundos
 setInterval(pollESPNAndNotify, 10000);
+
+// Keep-alive interno para evitar que Render se duerma en Free Tier mientras haya dispositivos conectados
+setInterval(() => {
+    if (registeredDevices.size > 0) {
+        const pingUrl = process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/status` : `http://localhost:${PORT}/status`;
+        fetch(pingUrl).catch(() => {});
+    }
+}, 3 * 60 * 1000);
 
 // 6. Servidor HTTP para recibir tokens desde el iPhone
 const server = http.createServer((req, res) => {
@@ -277,7 +442,7 @@ const server = http.createServer((req, res) => {
                     return;
                 }
 
-                console.log(`📱 [Dispositivo Conectado] Token: ${token.substring(0, 16)}... para evento: ${eventId}`);
+                console.log(`üì± [Dispositivo Conectado] Token: ${token.substring(0, 16)}... para evento: ${eventId}`);
                 
                 registeredDevices.set(token, {
                     eventId,
@@ -289,7 +454,7 @@ const server = http.createServer((req, res) => {
                 });
 
                 res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ success: true, message: "Token registrado en la nube con éxito" }));
+                res.end(JSON.stringify({ success: true, message: "Token registrado en la nube con √©xito" }));
 
                 setTimeout(pollESPNAndNotify, 500);
             } catch (err) {
@@ -317,7 +482,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, "0.0.0.0", () => {
     console.log("====================================================");
-    console.log(`⚡ ClashTime APNs Cloud Engine corriendo en el puerto ${PORT}`);
-    console.log(`🔑 Key ID: ${KEY_ID} | Team: ${TEAM_ID}`);
+    console.log(`‚ö° ClashTime APNs Cloud Engine corriendo en el puerto ${PORT}`);
+    console.log(`üîë Key ID: ${KEY_ID} | Team: ${TEAM_ID}`);
     console.log("====================================================");
 });
